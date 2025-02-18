@@ -114,7 +114,7 @@ func (t *TeamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	for _, ns := range team.Spec.Namespaces {
 		namespace := &corev1.Namespace{}
 
-		err := t.Client.Get(ctx, types.NamespacedName{Name: ns}, namespace)
+		err := t.Client.Get(ctx, types.NamespacedName{Name: ns.Name}, namespace)
 		if err != nil {
 			log.Error(err, "failed to get namespace", "namespace", ns)
 			return ctrl.Result{}, err
@@ -240,7 +240,7 @@ func (t *TeamReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (t *TeamReconciler) finalizeNamespace(ctx context.Context, req ctrl.Request, ns *corev1.Namespace, team *teamv1alpha1.Team) error {
 
 	for i, namespace := range team.Spec.Namespaces {
-		if namespace == ns.Name {
+		if namespace.Name == ns.Name {
 			team.Spec.Namespaces = append(team.Spec.Namespaces[:i], team.Spec.Namespaces[i+1:]...)
 			break
 		}
