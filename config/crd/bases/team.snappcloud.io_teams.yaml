@@ -42,22 +42,12 @@ spec:
               namespaces:
                 items:
                   properties:
-                    labels:
-                      items:
-                        properties:
-                          key:
-                            type: string
-                          value:
-                            type: string
-                        required:
-                        - key
-                        - value
-                        type: object
-                      type: array
+                    envLabels:
+                      type: string
                     name:
                       type: string
                   required:
-                  - labels
+                  - envLabels
                   - name
                   type: object
                 type: array

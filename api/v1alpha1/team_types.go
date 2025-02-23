@@ -23,14 +23,9 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-type Label struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
 type Namespace struct {
 	Name   string  `json:"name"`
-	Labels []Label `json:"labels"`
+	envLabel string `json:"envLabels"`
 }
 
 // TeamSpec defines the desired state of Team
