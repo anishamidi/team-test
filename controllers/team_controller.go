@@ -120,6 +120,7 @@ func (t *TeamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			return ctrl.Result{}, err
 		}
 		namespace.Labels["snappcloud.io/team"] = teamName
+		namespace.Labels["environment"] = ns.EnvLabel
 		namespace.Labels["snappcloud.io/datasource"] = "true"
 
 		if namespace.ObjectMeta.DeletionTimestamp.IsZero() {

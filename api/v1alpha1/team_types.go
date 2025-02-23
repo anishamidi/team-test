@@ -25,7 +25,7 @@ import (
 
 type Namespace struct {
 	Name     string `json:"name"`
-	EnvLabel string `json:"envLabels"`
+	EnvLabel string `json:"envLabel"`
 }
 
 // TeamSpec defines the desired state of Team
