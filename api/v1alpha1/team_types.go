@@ -24,8 +24,8 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 type Namespace struct {
-	Name   string  `json:"name"`
-	envLabel string `json:"envLabels"`
+	Name     string `json:"name"`
+	EnvLabel string `json:"envLabels"`
 }
 
 // TeamSpec defines the desired state of Team
