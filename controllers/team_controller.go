@@ -111,7 +111,7 @@ func (t *TeamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	// adding team label for each namespace in team spec
-	for _, ns := range team.Spec.Namespaces {
+	for _, ns := range team.Spec.Ns {
 		namespace := &corev1.Namespace{}
 
 		err := t.Client.Get(ctx, types.NamespacedName{Name: ns.Name}, namespace)
@@ -240,9 +240,9 @@ func (t *TeamReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (t *TeamReconciler) finalizeNamespace(ctx context.Context, req ctrl.Request, ns *corev1.Namespace, team *teamv1alpha1.Team) error {
 
-	for i, namespace := range team.Spec.Namespaces {
+	for i, namespace := range team.Spec.Ns {
 		if namespace.Name == ns.Name {
-			team.Spec.Namespaces = append(team.Spec.Namespaces[:i], team.Spec.Namespaces[i+1:]...)
+			team.Spec.Ns = append(team.Spec.Ns[:i], team.Spec.Ns[i+1:]...)
 			break
 		}
 	}

@@ -35,7 +35,8 @@ type TeamSpec struct {
 
 	// Foo is an example field of Team. Edit team_types.go to remove/update
 	TeamAdmin  string      `json:"teamAdmin,omitempty"`
-	Namespaces []Namespace `json:"namespaces,omitempty"`
+	Namespaces []string    `json:"namespaces,omitempty"`
+	Ns         []Namespace `json:"nses,omitempty"`
 }
 
 // TeamStatus defines the observed state of Team

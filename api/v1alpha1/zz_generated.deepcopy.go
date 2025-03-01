@@ -103,6 +103,11 @@ func (in *TeamSpec) DeepCopyInto(out *TeamSpec) {
 	*out = *in
 	if in.Namespaces != nil {
 		in, out := &in.Namespaces, &out.Namespaces
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.Ns != nil {
+		in, out := &in.Ns, &out.Ns
 		*out = make([]Namespace, len(*in))
 		copy(*out, *in)
 	}

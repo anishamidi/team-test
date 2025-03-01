@@ -41,6 +41,10 @@ spec:
             properties:
               namespaces:
                 items:
+                  type: string
+                type: array
+              nses:
+                items:
                   properties:
                     envLabel:
                       type: string
