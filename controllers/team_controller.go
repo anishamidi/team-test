@@ -122,6 +122,12 @@ func (t *TeamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			log.Error(err, "failed to get namespace", "namespace", ns.Name)
 			return ctrl.Result{}, err
 		}
+		for _, l := range namespace.Labels {
+			log.Info("*********************************lable*********************************")
+
+			log.Info(l)
+		}
+
 		namespace.Labels["snappcloud.io/team"] = teamName
 		log.Info(teamName)
 
