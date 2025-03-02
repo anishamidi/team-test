@@ -113,14 +113,21 @@ func (t *TeamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	// adding team label for each namespace in team spec
 	for _, ns := range team.Spec.Projects {
 		namespace := &corev1.Namespace{}
+		log.Info("*********************************")
+		log.Info(ns.Name)
+		log.Info(ns.EnvLabel)
 
 		err := t.Client.Get(ctx, types.NamespacedName{Name: ns.Name}, namespace)
 		if err != nil {
-			log.Error(err, "failed to get namespace", "namespace", ns)
+			log.Error(err, "failed to get namespace", "namespace", ns.Name)
 			return ctrl.Result{}, err
 		}
 		namespace.Labels["snappcloud.io/team"] = teamName
+		log.Info(teamName)
+
 		namespace.Labels["environment"] = ns.EnvLabel
+		log.Info(ns.EnvLabel)
+
 		namespace.Labels["snappcloud.io/datasource"] = "true"
 
 		if namespace.ObjectMeta.DeletionTimestamp.IsZero() {
