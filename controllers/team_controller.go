@@ -113,27 +113,14 @@ func (t *TeamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	// adding team label for each namespace in team spec
 	for _, ns := range team.Spec.Projects {
 		namespace := &corev1.Namespace{}
-		log.Info("*********************************")
-		log.Info(ns.Name)
-		log.Info(ns.EnvLabel)
 
 		err := t.Client.Get(ctx, types.NamespacedName{Name: ns.Name}, namespace)
 		if err != nil {
 			log.Error(err, "failed to get namespace", "namespace", ns.Name)
 			return ctrl.Result{}, err
 		}
-		for _, l := range namespace.Labels {
-			log.Info("*********************************lable*********************************")
-
-			log.Info(l)
-		}
-
 		namespace.Labels["snappcloud.io/team"] = teamName
-		log.Info(teamName)
-
 		namespace.Labels["environment"] = ns.EnvLabel
-		log.Info(ns.EnvLabel)
-
 		namespace.Labels["snappcloud.io/datasource"] = "true"
 
 		if namespace.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -197,6 +184,9 @@ func (t *TeamReconciler) checkMetricNSForTeamIsDeleted(ctx context.Context, req 
 	metricTeamNS := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: req.Name + MetricNamespaceSuffix,
+			Labels: map[string]string{
+				"snappcloud.io/team": req.Name,
+			},
 		},
 	}
 	err := t.Client.Delete(ctx, metricTeamNS)
