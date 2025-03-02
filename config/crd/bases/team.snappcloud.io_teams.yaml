@@ -43,7 +43,7 @@ spec:
                 items:
                   type: string
                 type: array
-              nses:
+              projects:
                 items:
                   properties:
                     envLabel:

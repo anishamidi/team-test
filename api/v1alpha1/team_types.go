@@ -23,7 +23,7 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-type Namespace struct {
+type Project struct {
 	Name     string `json:"name"`
 	EnvLabel string `json:"envLabel"`
 }
@@ -34,9 +34,9 @@ type TeamSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of Team. Edit team_types.go to remove/update
-	TeamAdmin  string      `json:"teamAdmin,omitempty"`
-	Namespaces []string    `json:"namespaces,omitempty"`
-	Ns         []Namespace `json:"nses,omitempty"`
+	TeamAdmin  string    `json:"teamAdmin,omitempty"`
+	Namespaces []string  `json:"namespaces,omitempty"`
+	Projects   []Project `json:"projects,omitempty"`
 }
 
 // TeamStatus defines the observed state of Team
