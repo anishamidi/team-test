@@ -169,6 +169,9 @@ func (t *TeamReconciler) CheckMetricNSForTeamIsCreated(ctx context.Context, req 
 	metricTeamNS := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: req.Name + MetricNamespaceSuffix,
+			Labels: map[string]string{
+				"snappcloud.io/team": req.Name,
+			},
 		},
 	}
 	err := t.Client.Create(ctx, metricTeamNS)
@@ -184,9 +187,6 @@ func (t *TeamReconciler) checkMetricNSForTeamIsDeleted(ctx context.Context, req 
 	metricTeamNS := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: req.Name + MetricNamespaceSuffix,
-			Labels: map[string]string{
-				"snappcloud.io/team": req.Name,
-			},
 		},
 	}
 	err := t.Client.Delete(ctx, metricTeamNS)
