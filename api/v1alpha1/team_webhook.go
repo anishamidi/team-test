@@ -1,107 +1,207 @@
-package controllers
+/*
+Copyright 2023.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package v1alpha1
 
 import (
 	"context"
-	"time"
+	"errors"
+	"fmt"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-	"github.com/snapp-incubator/team-operator/api/v1alpha1"
+	authv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
-type Project struct {
-	Name     string `json:"name"`
-	EnvLabel string `json:"envLabel"`
+// log is for logging in this package.
+var teamlog = logf.Log.WithName("team-resource")
+
+func (t *Team) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewWebhookManagedBy(mgr).For(t).Complete()
 }
 
-var (
-	namespaces = []string{"test-ns-1", "test-ns-2"}
-	teamAdmin  = "user-test"
-	teamName   = "test-cloud"
-	// Define the `Project` type
+// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
-	// Add projects with their respective values
-	projects = []v1alpha1.Project{
-		{Name: "test-ns-1", EnvLabel: "staging"},
-		{Name: "test-ns-2", EnvLabel: "production"},
+// TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
+//+kubebuilder:rbac:groups="",resources=namespaces,verbs=create;get;list;patch;update;watch
+//+kubebuilder:rbac:groups=authorization.k8s.io,resources=localsubjectaccessreviews,verbs=create
+//+kubebuilder:webhook:path=/validate-team-snappcloud-io-v1alpha1-team,mutating=false,failurePolicy=fail,sideEffects=None,groups=team.snappcloud.io,resources=teams,verbs=create;update,versions=v1alpha1,name=vteam.kb.io,admissionReviewVersions=v1
+
+var _ webhook.Validator = &Team{}
+var teamns corev1.Namespace
+
+func (t *Team) ValidateCreate() error {
+	teamlog.Info("validating team create", "name", t.GetName())
+	clientSet, err := getClient()
+	if err != nil {
+		teamlog.Error(err, "error happened while validating create", "namespace", t.GetNamespace(), "name", t.GetName())
+		return errors.New("could not create client, failed to update team object")
 	}
-)
+	for _, ns := range t.Spec.Projects {
+		// Check if namespace does not exist or has been deleted
+		teamns, err = nsExists(clientSet, t.Name, ns.Name)
+		if err != nil {
+			return err
+		}
 
-var _ = Describe("Testing Team", func() {
-	ctx := context.Background()
-	validTeamObj := &v1alpha1.Team{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: teamName,
-		},
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "team.snappcloud.io/v1alpha1",
-			Kind:       "Team",
-		},
-		Spec: v1alpha1.TeamSpec{
-			TeamAdmin:  teamAdmin,
-			Namespaces: namespaces,
-			Projects:   projects,
-		},
+		// Check if namespace already has been added to another team
+		err = nsHasTeam(t, &teamns)
+		if err != nil {
+			return err
+		}
+
+		// Check If user has access to this namespace
+		err = teamAdminAccess(t, ns.Name, clientSet)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t *Team) ValidateUpdate(old runtime.Object) error {
+	teamlog.Info("validating team update", "name", t.GetName())
+
+	clientSet, err := getClient()
+	if err != nil {
+		teamlog.Error(err, "error happened while validating update", "namespace", t.GetNamespace(), "name", t.GetName())
+		return errors.New("fail to get client, failed to update team object")
+	}
+	for _, ns := range t.Spec.Projects {
+		//check if namespace does not exist or has been deleted
+		teamns, err = nsExists(clientSet, t.Name, ns.Name)
+		if err != nil {
+			return err
+		}
+
+		//check if namespace already has been added to another team
+		err = nsHasTeam(t, &teamns)
+		if err != nil {
+			return err
+		}
+
+		//Check If user has access to this namespace
+		err = teamAdminAccess(t, ns.Name, clientSet)
+		if err != nil {
+			return err
+		}
 	}
 
-	BeforeEach(func() {
-		// create namespaces
-		for _, ns := range namespaces {
-			nsObj := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: ns,
-				},
-			}
-			err := k8sClient.Create(ctx, nsObj)
-			if err != nil {
-				if !errors.IsAlreadyExists(err) {
-					Expect(err).To(BeNil())
-				}
+	//prevent deleting a namespace that have the team label
+
+	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{"snappcloud.io/team": t.Name}}
+
+	listOptions := metav1.ListOptions{
+		LabelSelector: labels.Set(labelSelector.MatchLabels).String(),
+		Limit:         100,
+	}
+	namespaces, err := clientSet.CoreV1().Namespaces().List(context.TODO(), listOptions)
+	if err != nil {
+		teamlog.Error(err, "can not get list of namespaces")
+	}
+
+	for _, ni := range namespaces.Items {
+		exists := false
+		for _, ns := range t.Spec.Projects {
+			if ni.Name == ns.Name {
+				exists = true
 			}
 		}
-	})
+		if !exists {
+			errMessage := fmt.Sprintf("namespace \"%s\" has team label but does not exist in \"%s\" team", ni.Name, t.Name)
+			return errors.New(errMessage)
+		}
+	}
+	return nil
+}
 
-	Context("When creating and deleting Team", func() {
-		It("should create metric namespace", func() {
-			err := k8sClient.Create(ctx, validTeamObj)
-			if err != nil && !errors.IsAlreadyExists(err) {
-				Expect(err).To(BeNil())
-			}
+func (t *Team) ValidateDelete() error {
+	teamlog.Info("validate delete", "name", t.Name)
+	return nil
+}
 
-			metricNS := &corev1.Namespace{}
-			metricNSName := types.NamespacedName{
-				Name: teamName + MetricNamespaceSuffix,
-			}
-			time.Sleep(5 * time.Second)
-			err = k8sClient.Get(ctx, metricNSName, metricNS)
-			Expect(err).To(BeNil())
-		})
+func getClient() (c kubernetes.Clientset, err error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		teamlog.Error(err, "can not get in-cluster config.")
+		return c, errors.New("something went wrong please contact the cloud team")
+	}
 
-		It("all namespaces should have the team and datasource labels", func() {
-			for _, ns := range projects {
-				nsObj := &corev1.Namespace{}
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: ns.Name}, nsObj)
-				Expect(err).To(BeNil())
-				Expect(nsObj.ObjectMeta.Labels["snappcloud.io/team"]).To(Equal(teamName))
-				Expect(nsObj.ObjectMeta.Labels["snappcloud.io/datasource"]).To(Equal("true"))
-				Expect(nsObj.ObjectMeta.Labels["env"]).To(Equal(ns.EnvLabel))
+	clientSet, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		teamlog.Error(err, "can not create clientSet")
+		return *clientSet, errors.New("something went wrong please contact cloud team")
+	}
+	return *clientSet, nil
+}
 
-			}
-		})
+func nsExists(c kubernetes.Clientset, team, ns string) (tns corev1.Namespace, err error) {
+	teamNS, errNSGet := c.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
 
-		It("should delete metric namespace", func() {
-			err := k8sClient.Delete(ctx, validTeamObj)
-			Expect(err).To(BeNil())
-			time.Sleep(5 * time.Second)
-			metricNS := &corev1.Namespace{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Name: teamName + MetricNamespaceSuffix}, metricNS)
-			if err != nil || metricNS.Status.Phase != corev1.NamespaceTerminating {
-				Expect(err).NotTo(BeNil())
-			}
-		})
-	})
-})
+	if errNSGet != nil {
+		errorResp := fmt.Sprintf("Error while getting namespace \"%s\" for team \"%s\". error: %s", ns, team, errNSGet.Error())
+		return *teamNS, errors.New(errorResp)
+	}
+	return *teamNS, nil
+}
+
+func nsHasTeam(r *Team, tns *corev1.Namespace) (err error) {
+	if val, ok := tns.Labels["snappcloud.io/team"]; ok {
+		if tns.Labels["snappcloud.io/team"] != r.Name {
+			errorResp := fmt.Sprintf("namespace \"%s\" inside the Namespaces of team \"%s\" already has the team label \"%s\", please ask in cloud-support if you need to detach the namespace from previous team", tns.Name, r.Name, val)
+			return errors.New(errorResp)
+		}
+	}
+	return nil
+}
+
+func teamAdminAccess(r *Team, ns string, c kubernetes.Clientset) (err error) {
+	action := authv1.ResourceAttributes{
+		Namespace: ns,
+		Verb:      "create",
+		Resource:  "rolebindings",
+		Group:     "rbac.authorization.k8s.io",
+		Version:   "v1",
+	}
+	check := authv1.LocalSubjectAccessReview{
+		ObjectMeta: metav1.ObjectMeta{Namespace: ns},
+		Spec: authv1.SubjectAccessReviewSpec{
+			User:               r.Spec.TeamAdmin,
+			ResourceAttributes: &action,
+		},
+	}
+
+	resp, errAuth := c.AuthorizationV1().
+		LocalSubjectAccessReviews(ns).
+		Create(context.TODO(), &check, metav1.CreateOptions{})
+
+	if errAuth != nil {
+		teamlog.Error(errAuth, "error happened while checking team owner permission")
+	}
+	if !resp.Status.Allowed {
+		errMessage := fmt.Sprintf("team owner \"%s\" is not allowed to add namespace \"%s\" to team \"%s\", please add \"%s\" as admin of the project with the followig command: oc policy add-role-to-user admin %s -n %s", r.Spec.TeamAdmin, ns, r.Name, r.Spec.TeamAdmin, r.Spec.TeamAdmin, ns)
+		return errors.New(errMessage)
+	}
+	return nil
+
+}
